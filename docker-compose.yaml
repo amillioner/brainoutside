@@ -1,11 +1,11 @@
 # Hostinger VPS Docker deploy — Hostinger API resolves docker-compose.yaml
-# from the repo root (not docker-compose.yml). Publishes HTTP on port 80 for
-# first-boot /setup; put Cloudflare or Hostinger TLS in front for production.
+# from the repo root (not docker-compose.yml). Traefik on the VPS terminates
+# TLS; set TRAEFIK_HOST in project env (e.g. elightech.myddns.me).
 #
 # Set in Hostinger project env (or .env on VPS):
 #   POSTGRES_PASSWORD=<long random>
-#   ALLOWED_HOSTS=brain.yourdomain.com,your-vps-ip
-#   SECURE_SSL_REDIRECT_ENABLED=0   (until TLS terminates in front)
+#   ALLOWED_HOSTS=brainoutside.${TRAEFIK_HOST},your-vps-ip
+#   TRAEFIK_HOST=elightech.myddns.me
 
 x-app: &app
   build: .
@@ -42,8 +42,12 @@ services:
     environment:
       <<: *app-env
       MCP_LOOPBACK_HOST: mcp
-    ports:
-      - "80:8000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${TRAEFIK_HOST}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=letsencrypt
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
       interval: 30s
