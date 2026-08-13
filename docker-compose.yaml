@@ -1,0 +1,121 @@
+# Hostinger VPS Docker deploy — Hostinger API resolves docker-compose.yaml
+# from the repo root (not docker-compose.yml). Publishes HTTP on port 80 for
+# first-boot /setup; put Cloudflare or Hostinger TLS in front for production.
+#
+# Set in Hostinger project env (or .env on VPS):
+#   POSTGRES_PASSWORD=<long random>
+#   ALLOWED_HOSTS=brain.yourdomain.com,your-vps-ip
+#   SECURE_SSL_REDIRECT_ENABLED=0   (until TLS terminates in front)
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 60s
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-env
+    DJANGO_SETTINGS_MODULE: config.settings.prod
+    DATABASE_URL: postgres://brain:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/brain
+    REDIS_URL: redis://redis:6379/0
+    BRAIN_REPO_DIR: /data/brain-repo
+    BRAIN_VIEWS_DIR: /data/brain-views
+    BRAIN_STATE_DIR: /data/state
+    BRAIN_GIT_SSH_KEY_PATH: /run/secrets/brain_deploy_key
+    SECURE_SSL_REDIRECT_ENABLED: ${SECURE_SSL_REDIRECT_ENABLED:-0}
+  volumes:
+    - brain-repo:/data/brain-repo
+    - brain-views:/data/brain-views
+    - brain-state:/data/state
+    - ${BRAIN_DEPLOY_KEY_FILE:-./secrets/brain_deploy_key}:/run/secrets/brain_deploy_key:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  web:
+    <<: *app
+    command: [web]
+    environment:
+      <<: *app-env
+      MCP_LOOPBACK_HOST: mcp
+    ports:
+      - "80:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+
+  mcp:
+    <<: *app
+    command: [mcp]
+    environment:
+      <<: *app-env
+      MCP_LOOPBACK_HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    command: [worker]
+    environment:
+      <<: *app-env
+      MCP_LOOPBACK_HOST: mcp
+      BRAIN_GIT_WRITE_PAT_PATH: /run/secrets/brain_write_pat
+    volumes:
+      - brain-repo:/data/brain-repo
+      - brain-views:/data/brain-views
+      - brain-state:/data/state
+      - ${BRAIN_DEPLOY_KEY_FILE:-./secrets/brain_deploy_key}:/run/secrets/brain_deploy_key:ro
+      - ${BRAIN_GIT_WRITE_PAT_FILE:-./secrets/brain_write_pat}:/run/secrets/brain_write_pat:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brain
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain -d brain"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  brain-repo:
+  brain-views:
+  brain-state:
+  pgdata:
+  redisdata:
