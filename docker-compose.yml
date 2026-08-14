@@ -31,7 +31,9 @@ x-app: &app
   stop_grace_period: 60s
   env_file:
     - path: .env
-      required: false  # Coolify injects env directly; a file is optional
+      required: false
+    - path: .env.local
+      required: false
   environment: &app-env
     DJANGO_SETTINGS_MODULE: config.settings.prod
     DATABASE_URL: postgres://brain:${POSTGRES_PASSWORD:?set in Coolify}@postgres:5432/brain

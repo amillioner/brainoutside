@@ -74,17 +74,19 @@ function Write-Fail { param([string]$Text) Write-Host "!!  $Text" -ForegroundCol
 
 function Get-DotEnvValue {
     param([string]$Key, [string]$Default = '')
-    $envPath = Join-Path $Root '.env'
-    if (Test-Path $envPath) {
+    $value = $Default
+    foreach ($name in @('.env', '.env.local')) {
+        $envPath = Join-Path $Root $name
+        if (-not (Test-Path $envPath)) { continue }
         foreach ($line in (Get-Content $envPath)) {
             $trimmed = $line.Trim()
             if ($trimmed.StartsWith('#')) { continue }
             if ($trimmed.StartsWith("$Key=")) {
-                return $trimmed.Substring($Key.Length + 1).Trim().Trim('"').Trim("'")
+                $value = $trimmed.Substring($Key.Length + 1).Trim().Trim('"').Trim("'")
             }
         }
     }
-    return $Default
+    return $value
 }
 
 function Initialize-Compose {

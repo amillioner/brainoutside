@@ -9,7 +9,9 @@ def main() -> None:
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(Path(__file__).resolve().parent / ".env")
+        _root = Path(__file__).resolve().parent
+        load_dotenv(_root / ".env")
+        load_dotenv(_root / ".env.local", override=True)
     except ImportError:
         pass  # python-dotenv installed by `make setup`; first-run resilience
 

@@ -28,7 +28,10 @@ class Settings(BaseSettings):
     """Project-wide typed settings."""
 
     model_config = SettingsConfigDict(
-        env_file=str(REPO_ROOT / ".env"),
+        env_file=(
+            str(REPO_ROOT / ".env"),
+            str(REPO_ROOT / ".env.local"),
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # tolerate unknown env vars without failing boot
