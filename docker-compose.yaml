@@ -4,7 +4,7 @@
 #
 # Set in Hostinger project env (or .env on VPS):
 #   POSTGRES_PASSWORD=<long random>
-#   ALLOWED_HOSTS=brainoutside.${TRAEFIK_HOST},your-vps-ip
+#   ALLOWED_HOSTS=irving-dental-forms.cloud,www.irving-dental-forms.cloud,brainoutside.${TRAEFIK_HOST},your-vps-ip
 #   TRAEFIK_HOST=elightech.myddns.me
 
 x-app: &app
@@ -14,6 +14,8 @@ x-app: &app
   stop_grace_period: 60s
   env_file:
     - path: .env
+      required: false
+    - path: .env.local
       required: false
   environment: &app-env
     DJANGO_SETTINGS_MODULE: config.settings.prod
@@ -44,7 +46,7 @@ services:
       MCP_LOOPBACK_HOST: mcp
     labels:
       - traefik.enable=true
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`brain.elite.cloud`) || Host(`${COMPOSE_PROJECT_NAME}.${TRAEFIK_HOST}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`irving-dental-forms.cloud`) || Host(`www.irving-dental-forms.cloud`) || Host(`${COMPOSE_PROJECT_NAME}.${TRAEFIK_HOST}`)
       - traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure
       - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=letsencrypt
       - traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000
